@@ -1,0 +1,1124 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>hamdy pro - نظام إدارة المبيعات ونقطة البيع</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Font Cairo -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <!-- Alpine.js Library -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            700: '#15803d',
+                            800: '#166534',
+                            900: '#14532d',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Cairo', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* أنيميشين شريط الأخبار المتحرك */
+@keyframes newsTicker {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+.ticker-content {
+    display: inline-block;
+    white-space: nowrap;
+    animation: newsTicker 25s linear infinite;
+}
+
+.ticker-container:hover .ticker-content {
+    animation-play-state: paused; /* إيقاف الحركة عند وقوف الماوس عليه */
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        body { font-family: 'Cairo', sans-serif; }
+        [x-cloak] { display: none !important; }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 antialiased h-screen overflow-hidden" x-data="posApp()" x-init="initApp()">
+
+    <!-- Hidden Iframe Dedicated strictly for Printing Receipts without blank page bugs -->
+    <iframe id="receiptPrintFrame" style="position: absolute; width: 0; height: 0; border: 0; visibility: hidden;"></iframe>
+
+    <div class="flex h-full w-full">
+
+        <!-- Sidebar Navigation Bar -->
+        <aside class="w-64 bg-slate-900 text-white flex flex-col justify-between shadow-xl z-20 flex-shrink-0">
+            <div>
+                <!-- System Logo / Header -->
+                <div class="p-4 bg-slate-950 flex items-center space-x-3 space-x-reverse border-b border-slate-800">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-emerald-400 flex items-center justify-center text-white shadow-lg font-bold text-xl">
+                        <i class="fa-solid fa-cash-register"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-base font-extrabold text-white tracking-wide leading-tight truncate w-36" x-text="settings.storeName"></h1>
+                        <p class="text-[11px] text-emerald-400 font-semibold flex items-center gap-1">
+                            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                        hamdy mohamed
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Navigation Tabs Links -->
+                <nav class="p-3 space-y-1 overflow-y-auto max-h-[calc(100vh-130px)]">
+                    <template x-for="tab in tabs" :key="tab.id">
+                        <button 
+                            @click="activeTab = tab.id" 
+                            :class="activeTab === tab.id ? 'bg-brand-600 text-white shadow-lg shadow-brand-600/30 font-bold' : 'text-slate-300 hover:bg-slate-800 hover:text-white'"
+                            class="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all duration-200 text-right group">
+                            <div class="flex items-center space-x-3 space-x-reverse">
+                                <i :class="tab.icon + ' text-base transition-transform group-hover:scale-110'"></i>
+                                <span class="text-xs" x-text="tab.name"></span>
+                            </div>
+                            <span x-show="tab.id === 'inventory' && lowStockCount > 0" class="text-[10px] bg-red-500 text-white font-bold px-2 py-0.5 rounded-full" x-text="lowStockCount"></span>
+                        </button>
+                    </template>
+                </nav>
+            </div>
+
+            <!-- Footer Quick Status -->
+            <div class="p-3 bg-slate-950 border-t border-slate-800 text-[11px] text-slate-400 flex justify-between items-center">
+                <div>إصدار: <span class="text-emerald-400 font-mono font-bold">v3.0 PRO</span></div>
+                <div class="flex items-center gap-1 text-emerald-400 font-bold">
+                    <i class="fa-solid fa-circle text-[8px]"></i> متصل
+                </div>
+            </div>
+        </aside>
+
+        <main class="flex-1 flex flex-col h-full bg-slate-100 overflow-hidden">
+
+            <!-- Top Header Bar -->
+            <header class="bg-white border-b border-gray-200 h-14 px-6 flex items-center justify-between shadow-sm z-10">
+                <div class="flex items-center space-x-4 space-x-reverse">
+                    <h2 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                        <i :class="getTabIcon(activeTab) + ' text-brand-600'"></i>
+                        <span x-text="getTabTitle(activeTab)"></span>
+                    </h2>
+                </div>
+
+                <div class="flex items-center space-x-4 space-x-reverse">
+                    <!-- Live Clock -->
+                    <div class="text-xs text-gray-600 bg-gray-100 px-3 py-1.5 rounded-lg border font-mono flex items-center gap-2">
+                        <i class="fa-regular fa-clock text-brand-600"></i>
+                        <span x-text="currentTime"></span>
+                    </div>
+
+                    <!-- Low Stock Alert Icon -->
+                    <button @click="activeTab = 'inventory'" class="relative p-2 text-gray-600 hover:text-brand-600 transition" title="المخزون المنخفض">
+                        <i class="fa-regular fa-bell text-lg"></i>
+                        <span x-show="lowStockCount > 0" x-text="lowStockCount" class="absolute top-1 right-1 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold"></span>
+                    </button>
+
+                    <!-- User Account / Store Name -->
+                    <div class="flex items-center space-x-2 space-x-reverse pl-2 border-r border-gray-200">
+                        <div class="w-8 h-8 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center font-bold">
+                            <i class="fa-solid fa-user-tie text-xs"></i>
+                        </div>
+                        <div class="text-xs">
+                            <p class="font-bold text-gray-800">الكاشير الرئيسي</p>
+                            <p class="text-gray-500 text-[10px]" x-text="settings.phone"></p>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Global Toast Alert Message -->
+            <div x-show="toast.show" 
+                x-transition:enter="transition ease-out duration-300 transform"
+                x-transition:enter-start="opacity-0 translate-y-[-20px]"
+                x-transition:enter-end="opacity-100 translate-y-0"
+                x-transition:leave="transition ease-in duration-200 transform"
+                x-transition:leave-start="opacity-100 translate-y-0"
+                x-transition:leave-end="opacity-0 translate-y-[-20px]"
+                class="fixed top-16 left-1/2 -translate-x-1/2 z-50 px-6 py-2.5 rounded-xl shadow-2xl flex items-center gap-3 text-white font-bold text-xs"
+                :class="toast.type === 'error' ? 'bg-red-600' : 'bg-emerald-600'"
+                x-cloak>
+                <i :class="toast.type === 'error' ? 'fa-solid fa-circle-exclamation' : 'fa-solid fa-circle-check'" class="text-base"></i>
+                <span x-text="toast.message"></span>
+            </div>
+
+            <!-- Content Screens Container -->
+            <div class="flex-1 overflow-hidden p-4">
+
+                <!-- POS Point of Sale Screen -->
+                <div x-show="activeTab === 'pos'" class="h-full flex flex-col lg:flex-row gap-4" x-cloak>
+                    <!-- Left / Products Grid Screen -->
+                    <div class="flex-1 flex flex-col bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                        <!-- Search & Categories Bar -->
+                        <div class="p-3 border-b border-gray-200 flex flex-wrap gap-3 items-center justify-between bg-gray-50">
+                            <!-- Search Field -->
+                            <div class="relative flex-1 min-w-[200px]">
+                                <i class="fa-solid fa-magnifying-glass absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                                <input type="text" x-model="searchQuery" placeholder="بحث باسم المنتج أو الباركود..." class="w-full pl-3 pr-9 py-2 rounded-xl border border-gray-300 text-xs focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                            </div>
+                            <!-- Category Chips Filter -->
+                            <div class="flex gap-1.5 overflow-x-auto pb-1 max-w-full">
+                                <button @click="selectedCategory = 'ALL'" 
+                                        :class="selectedCategory === 'ALL' ? 'bg-brand-600 text-white font-bold shadow-sm' : 'bg-white text-gray-700 border hover:bg-gray-100'"
+                                        class="px-3 py-1.5 rounded-xl text-xs whitespace-nowrap transition">
+                                    الكل
+                                </button>
+                                <template x-for="cat in categories" :key="cat.id">
+                                    <button @click="selectedCategory = cat.name" 
+                                            :class="selectedCategory === cat.name ? 'bg-brand-600 text-white font-bold shadow-sm' : 'bg-white text-gray-700 border hover:bg-gray-100'"
+                                            class="px-3 py-1.5 rounded-xl text-xs whitespace-nowrap transition" x-text="cat.name">
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+
+
+
+
+
+
+
+<!-- شريط الدعاية المتحرك (News Ticker) -->
+<div class="ticker-container bg-slate-900 border border-blue-500/30 rounded-xl my-2 py-1.5 px-3 overflow-hidden flex items-center gap-3 shadow-sm mx-3">
+    <!-- أيقونة وعنوان الشريط -->
+    <div class="bg-blue-600 text-white text-xs font-bold px-2.5 py-1 rounded-md shrink-0 flex items-center gap-1.5 shadow">
+        <i class="fa-solid fa-bullhorn text-amber-300 animate-pulse"></i>
+        <span>دعاية وتطوير</span>
+    </div>
+
+    <!-- الشريط المتحرك -->
+    <div class="w-full overflow-hidden relative text-xs font-semibold text-slate-300">
+        <div class="ticker-content flex items-center gap-8">
+            <span class="flex items-center gap-2">
+                <i class="fa-solid fa-code text-blue-400"></i>
+            برمجة وتصميم النظام بواسطة: المهندس/  <strong class="text-blue-300 font-bold" id="tickerDevName">حمدي محمد </strong>
+            </span>
+            <span class="text-slate-600">•</span>
+            <span class="flex items-center gap-2">
+                <i class="fa-solid fa-phone text-emerald-400"></i>
+                للدعم الفني والتواصل: <strong class="text-emerald-300 font-bold" id="tickerDevPhone">01063953787</strong>
+            </span>
+            <span class="text-slate-600">•</span>
+            <span class="flex items-center gap-2">
+                <i class="fa-solid fa-star text-amber-400"></i>
+                تطوير البرمجيات وأنظمة نقاط البيع والمواقع الإلكترونية
+            </span>
+        </div>
+    </div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                        <!-- Product Cards Grid -->
+                        <div class="flex-1 overflow-y-auto p-3 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 content-start">
+                            <template x-for="product in filteredProducts" :key="product.id">
+                                <div @click="addToCart(product)" class="bg-white border border-gray-200 hover:border-brand-500 hover:shadow-md rounded-2xl p-3 flex flex-col justify-between transition cursor-pointer group relative">
+                                    <div class="flex justify-between items-start mb-2">
+                                        <span class="text-[10px] bg-slate-100 text-slate-600 font-bold px-2 py-0.5 rounded" x-text="product.category"></span>
+                                        <span class="text-[10px] font-bold px-1.5 py-0.5 rounded" :class="product.stock > 5 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'" x-text="'المخزون: ' + product.stock"></span>
+                                    </div>
+                                    <h3 class="font-bold text-gray-800 text-xs line-clamp-2 mb-2 group-hover:text-brand-600 transition" x-text="product.name"></h3>
+                                    <div class="flex justify-between items-center mt-auto border-t pt-2">
+                                        <div class="text-brand-600 font-extrabold text-sm font-mono">
+                                            <span x-text="product.price.toFixed(2)"></span>
+                                            <span class="text-[10px] font-normal" x-text="settings.currency"></span>
+                                        </div>
+                                        <div class="w-7 h-7 rounded-full bg-brand-50 group-hover:bg-brand-600 text-brand-600 group-hover:text-white flex items-center justify-center transition">
+                                            <i class="fa-solid fa-plus text-xs"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- Right / Shopping Cart Panel -->
+                    <div class="w-full lg:w-96 bg-white rounded-2xl shadow-sm border border-gray-200 flex flex-col h-full overflow-hidden">
+                        <!-- Select Customer Dropdown -->
+                        <div class="p-3 border-b bg-gray-50 flex items-center justify-between">
+                            <div class="flex items-center gap-2 w-full">
+                                <i class="fa-solid fa-user-tag text-gray-400 text-xs"></i>
+                                <select x-model="selectedCustomer" class="w-full bg-white border border-gray-300 rounded-xl p-2 text-xs font-bold focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                                    <template x-for="customer in customers" :key="customer.id">
+                                        <option :value="customer.name" x-text="customer.name + ' (' + customer.phone + ')'"></option>
+                                    </template>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Cart Line Items -->
+                        <div class="flex-1 overflow-y-auto p-3 space-y-2">
+                            <template x-if="cart.length === 0">
+                                <div class="h-full flex flex-col items-center justify-center text-gray-400 py-12">
+                                    <i class="fa-solid fa-cart-shopping text-5xl mb-3 text-gray-200"></i>
+                                    <p class="text-xs">السلة فارغة، اضغط على منتج للإضافة</p>
+                                </div>
+                            </template>
+
+                            <template x-for="(item, index) in cart" :key="item.id">
+                                <div class="flex items-center justify-between p-2.5 bg-gray-50 rounded-xl border border-gray-100 hover:border-gray-300 transition">
+                                    <div class="flex-1">
+                                        <h4 class="font-bold text-xs text-gray-800 line-clamp-1" x-text="item.name"></h4>
+                                        <div class="text-[11px] text-gray-500 mt-0.5">
+                                            <span class="font-mono" x-text="item.price.toFixed(2)"></span> × <span class="font-bold text-gray-700 font-mono" x-text="item.qty"></span>
+                                            = <span class="font-bold text-brand-600 font-mono" x-text="(item.price * item.qty).toFixed(2)"></span> <span x-text="settings.currency"></span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Plus / Minus Controls -->
+                                    <div class="flex items-center gap-1 bg-white border rounded-lg p-1">
+                                        <button @click="updateQty(index, -1)" class="w-5 h-5 rounded flex items-center justify-center hover:bg-gray-100 text-gray-600 font-bold text-xs">-</button>
+                                        <span class="w-5 text-center text-xs font-bold font-mono" x-text="item.qty"></span>
+                                        <button @click="updateQty(index, 1)" class="w-5 h-5 rounded flex items-center justify-center hover:bg-gray-100 text-gray-600 font-bold text-xs">+</button>
+                                    </div>
+
+                                    <!-- Delete Item -->
+                                    <button @click="removeFromCart(index)" class="mr-2 text-red-400 hover:text-red-600 p-1">
+                                        <i class="fa-solid fa-trash-can text-xs"></i>
+                                    </button>
+                                </div>
+                            </template>
+                        </div>
+
+                        <!-- Checkout & Totals Summary -->
+                        <div class="p-4 border-t border-gray-200 bg-gray-50 space-y-2 text-xs">
+                            <div class="flex justify-between text-gray-600">
+                                <span>المجموع الفرعي:</span>
+                                <span class="font-bold font-mono text-gray-800" x-text="cartSubtotal.toFixed(2) + ' ' + settings.currency"></span>
+                            </div>
+                            <div class="flex justify-between text-gray-600">
+                                <span x-text="'الضريبة (' + settings.taxRate + '%):'"></span>
+                                <span class="font-bold font-mono text-gray-800" x-text="cartTax.toFixed(2) + ' ' + settings.currency"></span>
+                            </div>
+                            <div class="flex justify-between text-gray-600 items-center">
+                                <span>الخصم:</span>
+                                <div class="flex items-center gap-1 w-24">
+                                    <input type="number" x-model.number="cartDiscount" min="0" class="w-full bg-white border rounded p-1 text-center font-mono font-bold text-xs focus:ring-1 focus:ring-brand-500">
+                                    <span x-text="settings.currency"></span>
+                                </div>
+                            </div>
+
+                            <!-- Payment Options selection -->
+                            <div class="flex justify-between items-center pt-2 border-t">
+                                <span class="font-bold text-gray-700">طريقة الدفع:</span>
+                                <div class="flex gap-2">
+                                    <label class="flex items-center gap-1 cursor-pointer">
+                                        <input type="radio" value="نقدي" x-model="paymentMethod" class="text-brand-600 focus:ring-brand-500">
+                                        <span>نقدي</span>
+                                    </label>
+                                    <label class="flex items-center gap-1 cursor-pointer">
+                                        <input type="radio" value="بطاقة" x-model="paymentMethod" class="text-brand-600 focus:ring-brand-500">
+                                        <span>بطاقة</span>
+                                    </label>
+                                    <label class="flex items-center gap-1 cursor-pointer">
+                                        <input type="radio" value="محفظة" x-model="paymentMethod" class="text-brand-600 focus:ring-brand-500">
+                                        <span>محفظة</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Cash Calculations -->
+                            <div class="grid grid-cols-2 gap-2 pt-1">
+                                <div>
+                                    <span class="text-[10px] text-gray-500">المبلغ المستلم:</span>
+                                    <input type="number" x-model.number="amountReceived" min="0" class="w-full bg-white border rounded p-1 text-center font-mono font-bold text-xs">
+                                </div>
+                                <div>
+                                    <span class="text-[10px] text-gray-500">الباقي:</span>
+                                    <div class="w-full bg-gray-200 border rounded p-1 text-center font-mono font-bold text-xs text-brand-700" x-text="changeAmount.toFixed(2) + ' ' + settings.currency"></div>
+                                </div>
+                            </div>
+
+                            <div class="flex justify-between text-base font-extrabold text-gray-900 border-t pt-2">
+                                <span>الإجمالي النهائي:</span>
+                                <span class="text-brand-600 font-mono text-lg" x-text="cartTotal.toFixed(2) + ' ' + settings.currency"></span>
+                            </div>
+
+                            <!-- Submit Controls -->
+                            <div class="pt-2 grid grid-cols-2 gap-2">
+                                <button @click="cart = []; cartDiscount = 0;" class="py-2.5 rounded-xl border border-red-300 text-red-600 hover:bg-red-50 font-bold text-xs transition">
+                                    <i class="fa-solid fa-rotate-left ml-1"></i> إلغاء
+                                </button>
+                                <button @click="checkout()" :disabled="cart.length === 0" class="py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white font-bold text-xs shadow-lg transition flex items-center justify-center gap-2">
+                                    <i class="fa-solid fa-receipt"></i> تأكيد البيع
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Invoices Log Screen -->
+                <div x-show="activeTab === 'invoices'" class="bg-white rounded-2xl shadow-sm border border-gray-200 h-full flex flex-col p-4" x-cloak>
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-bold text-gray-800 text-base">سجل الفواتير والمبيعات</h3>
+                        <span class="text-xs bg-brand-50 text-brand-700 px-3 py-1 rounded-full font-bold" x-text="'إجمالي الفواتير: ' + invoices.length"></span>
+                    </div>
+                    <div class="flex-1 overflow-y-auto border rounded-xl">
+                        <table class="w-full text-right text-xs">
+                            <thead class="bg-gray-100 text-gray-600 sticky top-0">
+                                <tr>
+                                    <th class="p-3">رقم الفاتورة</th>
+                                    <th class="p-3">التاريخ والوقت</th>
+                                    <th class="p-3">العميل</th>
+                                    <th class="p-3">طريقة الدفع</th>
+                                    <th class="p-3">عدد الأصناف</th>
+                                    <th class="p-3">الإجمالي</th>
+                                    <th class="p-3 text-center">إجراءات (طباعة / حذف)</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y">
+                                <template x-for="(inv, idx) in invoices" :key="inv.id">
+                                    <tr class="hover:bg-gray-50">
+                                        <td class="p-3 font-bold font-mono text-brand-600" x-text="inv.id"></td>
+                                        <td class="p-3 font-mono text-gray-500" x-text="inv.date"></td>
+                                        <td class="p-3 font-semibold" x-text="inv.customer"></td>
+                                        <td class="p-3">
+                                            <span class="bg-gray-100 text-gray-700 px-2 py-0.5 rounded text-[10px] font-bold" x-text="inv.paymentMethod || 'نقدي'"></span>
+                                        </td>
+                                        <td class="p-3 text-gray-600" x-text="inv.items.length + ' أصناف'"></td>
+                                        <td class="p-3 font-bold font-mono text-gray-800" x-text="inv.total.toFixed(2) + ' ' + settings.currency"></td>
+                                        <td class="p-3 text-center space-x-2 space-x-reverse">
+                                            <button @click="printInvoice(inv)" class="bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white px-2.5 py-1 rounded-lg font-bold text-xs transition" title="طباعة الفاتورة">
+                                                <i class="fa-solid fa-print ml-1"></i> طباعة
+                                            </button>
+                                            <button @click="deleteInvoice(idx)" class="bg-red-50 text-red-600 hover:bg-red-600 hover:text-white px-2.5 py-1 rounded-lg font-bold text-xs transition" title="حذف الفاتورة">
+                                                <i class="fa-solid fa-trash ml-1"></i> حذف
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Products Management Screen -->
+                <div x-show="activeTab === 'products'" class="bg-white rounded-2xl shadow-sm border border-gray-200 h-full flex flex-col p-4" x-cloak>
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-bold text-gray-800 text-base">إدارة المنتجات والأصناف</h3>
+                        <button @click="openProductModal()" class="bg-brand-600 text-white text-xs font-bold px-4 py-2 rounded-xl hover:bg-brand-700 transition flex items-center gap-2">
+                            <i class="fa-solid fa-plus"></i> إضافة منتج جديد
+                        </button>
+                    </div>
+                    <div class="flex-1 overflow-y-auto border rounded-xl">
+                        <table class="w-full text-right text-xs">
+                            <thead class="bg-gray-100 text-gray-600 sticky top-0">
+                                <tr>
+                                    <th class="p-3">اسم المنتج</th>
+                                    <th class="p-3">التصنيف</th>
+                                    <th class="p-3">السعر</th>
+                                    <th class="p-3">الوحدة</th>
+                                    <th class="p-3">المخزون</th>
+                                    <th class="p-3 text-center">إجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y">
+                                <template x-for="(prod, idx) in products" :key="prod.id">
+                                    <tr class="hover:bg-gray-50">
+                                        <td class="p-3 font-bold text-gray-800" x-text="prod.name"></td>
+                                        <td class="p-3 text-gray-500" x-text="prod.category"></td>
+                                        <td class="p-3 font-bold font-mono text-brand-600" x-text="prod.price.toFixed(2) + ' ' + settings.currency"></td>
+                                        <td class="p-3 text-gray-500" x-text="prod.unit"></td>
+                                        <td class="p-3 font-bold font-mono" :class="prod.stock <= 5 ? 'text-red-600' : 'text-emerald-600'" x-text="prod.stock"></td>
+                                        <td class="p-3 text-center">
+                                            <button @click="deleteProduct(idx)" class="text-red-500 hover:text-red-700 font-bold p-1">
+                                                <i class="fa-solid fa-trash ml-1"></i> حذف
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Categories Screen -->
+                <div x-show="activeTab === 'categories'" class="bg-white rounded-2xl shadow-sm border border-gray-200 h-full p-4 flex flex-col" x-cloak>
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-bold text-gray-800 text-base">إدارة التصنيفات</h3>
+                        <div class="flex gap-2">
+                            <input type="text" x-model="newCategoryName" placeholder="اسم التصنيف الجديد..." class="border rounded-xl px-3 py-1.5 text-xs focus:ring-2 focus:ring-brand-500">
+                            <button @click="addCategory()" class="bg-brand-600 text-white text-xs px-4 py-1.5 rounded-xl font-bold">إضافة</button>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <template x-for="(cat, idx) in categories" :key="cat.id">
+                            <div class="p-4 bg-gray-50 border rounded-2xl flex justify-between items-center">
+                                <span class="font-bold text-xs text-gray-800" x-text="cat.name"></span>
+                                <button @click="categories.splice(idx, 1); saveToStorage();" class="text-red-500 hover:text-red-700 text-xs font-bold">حذف</button>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- Units Screen -->
+                <div x-show="activeTab === 'units'" class="bg-white rounded-2xl shadow-sm border border-gray-200 h-full p-4 flex flex-col" x-cloak>
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-bold text-gray-800 text-base">وحدات القياس</h3>
+                        <div class="flex gap-2">
+                            <input type="text" x-model="newUnitName" placeholder="الوحدة (قطعة، كيلو...)..." class="border rounded-xl px-3 py-1.5 text-xs focus:ring-2 focus:ring-brand-500">
+                            <button @click="addUnit()" class="bg-brand-600 text-white text-xs px-4 py-1.5 rounded-xl font-bold">إضافة</button>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <template x-for="(unit, idx) in units" :key="idx">
+                            <div class="p-3 bg-gray-50 border rounded-xl flex justify-between items-center text-xs font-bold">
+                                <span x-text="unit"></span>
+                                <button @click="units.splice(idx, 1); saveToStorage();" class="text-red-500">حذف</button>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- Inventory Control Screen -->
+                <div x-show="activeTab === 'inventory'" class="bg-white rounded-2xl shadow-sm border border-gray-200 h-full flex flex-col p-4" x-cloak>
+                    <h3 class="font-bold text-gray-800 text-base mb-4">مراقبة وتحديث كميات المخزون</h3>
+                    <div class="flex-1 overflow-y-auto border rounded-xl">
+                        <table class="w-full text-right text-xs">
+                            <thead class="bg-gray-100 text-gray-600">
+                                <tr>
+                                    <th class="p-3">اسم المنتج</th>
+                                    <th class="p-3">التصنيف</th>
+                                    <th class="p-3">المخزون الحالي</th>
+                                    <th class="p-3">الحالة</th>
+                                    <th class="p-3">تحديث الكمية</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y">
+                                <template x-for="prod in products" :key="prod.id">
+                                    <tr class="hover:bg-gray-50">
+                                        <td class="p-3 font-bold" x-text="prod.name"></td>
+                                        <td class="p-3 text-gray-500" x-text="prod.category"></td>
+                                        <td class="p-3 font-mono font-bold text-sm" x-text="prod.stock"></td>
+                                        <td class="p-3">
+                                            <span x-show="prod.stock <= 5" class="bg-red-100 text-red-700 px-2.5 py-1 rounded-full font-bold text-[10px]">مخزون منخفض!</span>
+                                            <span x-show="prod.stock > 5" class="bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-full font-bold text-[10px]">متوفر</span>
+                                        </td>
+                                        <td class="p-3 flex items-center gap-2">
+                                            <input type="number" x-model.number="prod.stock" @change="saveToStorage()" min="0" class="w-20 border rounded px-2 py-1 font-mono text-center text-xs">
+                                            <span class="text-[10px] text-gray-500">كمية متبقية</span>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Suppliers Screen -->
+                <div x-show="activeTab === 'suppliers'" class="bg-white rounded-2xl shadow-sm border border-gray-200 h-full p-4 flex flex-col" x-cloak>
+                    <h3 class="font-bold text-gray-800 text-base mb-4">دليل الموردين</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <template x-for="sup in suppliers" :key="sup.id">
+                            <div class="p-4 border rounded-2xl bg-gray-50 flex items-center justify-between">
+                                <div>
+                                    <h4 class="font-bold text-sm text-gray-800" x-text="sup.name"></h4>
+                                    <p class="text-xs text-gray-500 mt-1"><i class="fa-solid fa-phone ml-1"></i> <span x-text="sup.phone"></span></p>
+                                </div>
+                                <span class="bg-brand-100 text-brand-800 text-xs px-3 py-1 rounded-full font-bold" x-text="sup.company"></span>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- Customers Screen -->
+                <div x-show="activeTab === 'customers'" class="bg-white rounded-2xl shadow-sm border border-gray-200 h-full p-4 flex flex-col" x-cloak>
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-bold text-gray-800 text-base">إدارة وسجل العملاء</h3>
+                        <div class="flex gap-2">
+                            <input type="text" x-model="newCustomer.name" placeholder="اسم العميل..." class="border rounded-xl px-3 py-1.5 text-xs">
+                            <input type="text" x-model="newCustomer.phone" placeholder="رقم الهاتف..." class="border rounded-xl px-3 py-1.5 text-xs">
+                            <button @click="addCustomer()" class="bg-brand-600 text-white text-xs px-4 py-1.5 rounded-xl font-bold">إضافة عميل</button>
+                        </div>
+                    </div>
+                    <div class="flex-1 overflow-y-auto border rounded-xl">
+                        <table class="w-full text-right text-xs">
+                            <thead class="bg-gray-100 text-gray-600 sticky top-0">
+                                <tr>
+                                    <th class="p-3">اسم العميل</th>
+                                    <th class="p-3">رقم الهاتف</th>
+                                    <th class="p-3 text-center">إجراء الحذف</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y">
+                                <template x-for="(cust, idx) in customers" :key="cust.id">
+                                    <tr class="hover:bg-gray-50">
+                                        <td class="p-3 font-bold text-gray-800" x-text="cust.name"></td>
+                                        <td class="p-3 font-mono text-gray-600" x-text="cust.phone"></td>
+                                        <td class="p-3 text-center">
+                                            <button @click="deleteCustomer(idx)" class="bg-red-50 text-red-600 hover:bg-red-600 hover:text-white px-3 py-1 rounded-lg font-bold text-xs transition">
+                                                <i class="fa-solid fa-trash ml-1"></i> حذف العميل
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Reports Screen -->
+                <div x-show="activeTab === 'reports'" class="bg-white rounded-2xl shadow-sm border border-gray-200 h-full p-6 overflow-y-auto" x-cloak>
+                    <h3 class="font-bold text-gray-800 text-base mb-6">التقارير والمؤشرات المالية</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                        <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-5">
+                            <p class="text-xs text-emerald-600 font-bold mb-1">إجمالي المبيعات المحصلة</p>
+                            <h4 class="text-2xl font-extrabold text-emerald-800 font-mono" x-text="totalSales.toFixed(2) + ' ' + settings.currency"></h4>
+                        </div>
+                        <div class="bg-blue-50 border border-blue-200 rounded-2xl p-5">
+                            <p class="text-xs text-blue-600 font-bold mb-1">عدد الفواتير الصادرة</p>
+                            <h4 class="text-2xl font-extrabold text-blue-800 font-mono" x-text="invoices.length"></h4>
+                        </div>
+                        <div class="bg-amber-50 border border-amber-200 rounded-2xl p-5">
+                            <p class="text-xs text-amber-600 font-bold mb-1">إجمالي الضرائب المحصلة</p>
+                            <h4 class="text-2xl font-extrabold text-amber-800 font-mono" x-text="totalTaxCollected.toFixed(2) + ' ' + settings.currency"></h4>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Settings Screen -->
+                <div x-show="activeTab === 'settings'" class="bg-white rounded-2xl shadow-sm border border-gray-200 h-full p-6 overflow-y-auto" x-cloak>
+                    <div class="max-w-2xl mx-auto">
+                        <h3 class="font-bold text-gray-800 text-lg mb-6 pb-2 border-b flex items-center gap-2">
+                            <i class="fa-solid fa-sliders text-brand-600"></i>
+                            إعدادات المتجر والنظام
+                        </h3>
+
+                        <form @submit.prevent="saveSettings()" class="space-y-4">
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1">اسم المتجر / المحل</label>
+                                <input type="text" x-model="settingsForm.storeName" required class="w-full border border-gray-300 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-700 mb-1">رمز العملة (مثال: EGP, SAR)</label>
+                                    <input type="text" x-model="settingsForm.currency" required class="w-full border border-gray-300 rounded-xl p-2.5 text-xs font-bold focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-700 mb-1">نسبة الضريبة (%)</label>
+                                    <input type="number" step="0.1" min="0" x-model.number="settingsForm.taxRate" required class="w-full border border-gray-300 rounded-xl p-2.5 text-xs font-mono focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-700 mb-1">رقم الهاتف</label>
+                                    <input type="text" x-model="settingsForm.phone" class="w-full border border-gray-300 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-700 mb-1">عنوان المتجر</label>
+                                    <input type="text" x-model="settingsForm.address" class="w-full border border-gray-300 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1">ترويسة الفاتورة (تظهر بأعلى الإيصال)</label>
+                                <input type="text" x-model="settingsForm.receiptHeader" class="w-full border border-gray-300 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1">تذييل الفاتورة (أسفل الإيصال)</label>
+                                <input type="text" x-model="settingsForm.receiptFooter" class="w-full border border-gray-300 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                            </div>
+
+                            <div class="pt-4">
+                                <button type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-3 rounded-xl shadow-lg transition flex items-center justify-center gap-2 text-xs">
+                                    <i class="fa-solid fa-floppy-disk"></i>
+                                    حفظ وتطبيق الإعدادات فوراً
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- Application Logic Javascript Script -->
+    <script>
+        function posApp() {
+            return {
+                activeTab: 'pos',
+                currentTime: '',
+                searchQuery: '',
+                selectedCategory: 'ALL',
+                selectedCustomer: 'عميل نقدي',
+                paymentMethod: 'نقدي',
+                amountReceived: 0,
+                cartDiscount: 0,
+                newCategoryName: '',
+                newUnitName: '',
+                newCustomer: { name: '', phone: '' },
+
+                toast: { show: false, message: '', type: 'success' },
+
+                // Store Settings Model
+                settings: {
+                    storeName: 'سوبر ماركت البركة',
+                    currency: 'EGP',
+                    taxRate: 14,
+                    phone: '01000000000',
+                    address: 'القاهرة - مصر',
+                    receiptHeader: 'أهلاً بكم في متجرنا السريع',
+                    receiptFooter: 'البضاعة المباعة ترد وتستبدل خلال 14 يوماً'
+                },
+
+                settingsForm: {},
+
+                tabs: [
+                    { id: 'pos', name: 'نقطة البيع', icon: 'fa-solid fa-cart-shopping' },
+                    { id: 'invoices', name: 'الفواتير', icon: 'fa-solid fa-file-invoice-dollar' },
+                    { id: 'products', name: 'المنتجات', icon: 'fa-solid fa-box-open' },
+                    { id: 'categories', name: 'التصنيفات', icon: 'fa-solid fa-layer-group' },
+                    { id: 'units', name: 'الوحدات', icon: 'fa-solid fa-ruler-horizontal' },
+                    { id: 'inventory', name: 'المخزون', icon: 'fa-solid fa-warehouse' },
+                    { id: 'suppliers', name: 'الموردون', icon: 'fa-solid fa-truck-field' },
+                    { id: 'customers', name: 'العملاء', icon: 'fa-solid fa-users' },
+                    { id: 'reports', name: 'التقارير', icon: 'fa-solid fa-chart-pie' },
+                    { id: 'settings', name: 'الإعدادات', icon: 'fa-solid fa-sliders' },
+                ],
+
+                categories: [
+                    { id: 1, name: 'مشروبات' },
+                    { id: 2, name: 'معلبات' },
+                    { id: 3, name: 'منظفات' },
+                    { id: 4, name: 'حلويات' }
+                ],
+
+                units: ['قطعة', 'كيلو', 'علبة', 'كرتونة'],
+
+                products: [
+                    { id: 101, name: 'عصير برتقال طبيعي 1 لتر', price: 25.00, category: 'مشروبات', stock: 20, unit: 'علبة' },
+                    { id: 102, name: 'شاي أحمر فاخر 250جم', price: 45.00, category: 'مشروبات', stock: 15, unit: 'علبة' },
+                    { id: 103, name: 'زيت عباد الشمس 1 لتر', price: 65.00, category: 'معلبات', stock: 4, unit: 'زجاجة' },
+                    { id: 104, name: 'مكرونة ممتازة 400جم', price: 12.50, category: 'معلبات', stock: 50, unit: 'كيس' },
+                    { id: 105, name: 'صابون أيدي معطر', price: 18.00, category: 'منظفات', stock: 3, unit: 'قطعة' },
+                    { id: 106, name: 'شوكولاتة بالحليب', price: 15.00, category: 'حلويات', stock: 30, unit: 'قطعة' }
+                ],
+
+                suppliers: [
+                    { id: 1, name: 'شركة الأغذية المتحدة', phone: '01111111111', company: 'المبيعات الجملة' },
+                    { id: 2, name: 'مؤسسة المنظفات العصرية', phone: '01222222222', company: 'التوريدات العامة' }
+                ],
+
+                customers: [
+                    { id: 1, name: 'عميل نقدي', phone: '---' },
+                    { id: 2, name: 'أحمد محمود', phone: '01012345678' }
+                ],
+
+                cart: [],
+                invoices: [],
+
+                initApp() {
+                    this.loadStoredData();
+                    this.updateTime();
+                    setInterval(() => this.updateTime(), 1000);
+                },
+
+                loadStoredData() {
+                    const savedSettings = localStorage.getItem('pos_settings');
+                    if (savedSettings) {
+                        try { this.settings = { ...this.settings, ...JSON.parse(savedSettings) }; } catch(e) {}
+                    }
+                    this.settingsForm = { ...this.settings };
+
+                    const savedProducts = localStorage.getItem('pos_products');
+                    if (savedProducts) { try { this.products = JSON.parse(savedProducts); } catch(e) {} }
+
+                    const savedInvoices = localStorage.getItem('pos_invoices');
+                    if (savedInvoices) { try { this.invoices = JSON.parse(savedInvoices); } catch(e) {} }
+
+                    const savedCustomers = localStorage.getItem('pos_customers');
+                    if (savedCustomers) { try { this.customers = JSON.parse(savedCustomers); } catch(e) {} }
+
+                    const savedCategories = localStorage.getItem('pos_categories');
+                    if (savedCategories) { try { this.categories = JSON.parse(savedCategories); } catch(e) {} }
+
+                    const savedUnits = localStorage.getItem('pos_units');
+                    if (savedUnits) { try { this.units = JSON.parse(savedUnits); } catch(e) {} }
+                },
+
+                saveToStorage() {
+                    localStorage.setItem('pos_products', JSON.stringify(this.products));
+                    localStorage.setItem('pos_invoices', JSON.stringify(this.invoices));
+                    localStorage.setItem('pos_customers', JSON.stringify(this.customers));
+                    localStorage.setItem('pos_categories', JSON.stringify(this.categories));
+                    localStorage.setItem('pos_units', JSON.stringify(this.units));
+                },
+
+                saveSettings() {
+                    this.settings = { ...this.settingsForm };
+                    localStorage.setItem('pos_settings', JSON.stringify(this.settings));
+                    this.showToast('تم حفظ الإعدادات بنجاح وتحديث النظام!');
+                },
+
+                showToast(msg, type = 'success') {
+                    this.toast.message = msg;
+                    this.toast.type = type;
+                    this.toast.show = true;
+                    setTimeout(() => { this.toast.show = false; }, 3000);
+                },
+
+                updateTime() {
+                    const now = new Date();
+                    this.currentTime = now.toLocaleDateString('ar-EG') + ' ' + now.toLocaleTimeString('ar-EG');
+                },
+
+                // Computed Values
+                get cartSubtotal() {
+                    return this.cart.reduce((sum, i) => sum + (i.price * i.qty), 0);
+                },
+
+                get cartTax() {
+                    return (this.cartSubtotal * (parseFloat(this.settings.taxRate) || 0)) / 100;
+                },
+
+                get cartTotal() {
+                    const total = this.cartSubtotal + this.cartTax - (parseFloat(this.cartDiscount) || 0);
+                    return total > 0 ? total : 0;
+                },
+
+                get changeAmount() {
+                    const received = parseFloat(this.amountReceived) || 0;
+                    return received > this.cartTotal ? received - this.cartTotal : 0;
+                },
+
+                get filteredProducts() {
+                    return this.products.filter(p => {
+                        const matchesCat = this.selectedCategory === 'ALL' || p.category === this.selectedCategory;
+                        const matchesSearch = p.name.toLowerCase().includes(this.searchQuery.toLowerCase());
+                        return matchesCat && matchesSearch;
+                    });
+                },
+
+                get lowStockCount() {
+                    return this.products.filter(p => p.stock <= 5).length;
+                },
+
+                get totalSales() {
+                    return this.invoices.reduce((sum, inv) => sum + inv.total, 0);
+                },
+
+                get totalTaxCollected() {
+                    return this.invoices.reduce((sum, inv) => sum + inv.tax, 0);
+                },
+
+                // Actions
+                addToCart(product) {
+                    if (product.stock <= 0) {
+                        this.showToast('عفواً، هذا المنتج نفذ من المخزون!', 'error');
+                        return;
+                    }
+                    const existing = this.cart.find(item => item.id === product.id);
+                    if (existing) {
+                        if (existing.qty < product.stock) {
+                            existing.qty++;
+                        } else {
+                            this.showToast('وصلت للحد الأقصى للمخزون المتاح!', 'error');
+                        }
+                    } else {
+                        this.cart.push({ ...product, qty: 1 });
+                    }
+                },
+
+                updateQty(index, delta) {
+                    const item = this.cart[index];
+                    const prod = this.products.find(p => p.id === item.id);
+                    if (item.qty + delta > prod.stock) {
+                        this.showToast('الكمية المطلوبة غير متوفرة بالمخزون', 'error');
+                        return;
+                    }
+                    item.qty += delta;
+                    if (item.qty <= 0) {
+                        this.cart.splice(index, 1);
+                    }
+                },
+
+                removeFromCart(index) {
+                    this.cart.splice(index, 1);
+                },
+
+                // Checkout & Direct Hidden Iframe Printing Process
+                checkout() {
+                    if (this.cart.length === 0) return;
+
+                    // Deduct items stock
+                    this.cart.forEach(item => {
+                        const prod = this.products.find(p => p.id === item.id);
+                        if (prod) prod.stock -= item.qty;
+                    });
+
+                    const newInvoice = {
+                        id: 'INV-' + Math.floor(100000 + Math.random() * 900000),
+                        date: new Date().toLocaleString('ar-EG'),
+                        customer: this.selectedCustomer,
+                        paymentMethod: this.paymentMethod,
+                        items: JSON.parse(JSON.stringify(this.cart)),
+                        subtotal: this.cartSubtotal,
+                        tax: this.cartTax,
+                        discount: this.cartDiscount,
+                        total: this.cartTotal,
+                        received: parseFloat(this.amountReceived) || this.cartTotal,
+                        change: this.changeAmount
+                    };
+
+                    this.invoices.unshift(newInvoice);
+                    this.saveToStorage();
+
+                    // Trigger Print directly
+                    this.printInvoice(newInvoice);
+
+                    // Reset cart
+                    this.cart = [];
+                    this.cartDiscount = 0;
+                    this.amountReceived = 0;
+                    this.showToast('تمت عملية البيع بنجاح!');
+                },
+
+                // ABSOLUTE FIXED THERMAL RECEIPT PRINTING USING HIDDEN IFRAME
+                printInvoice(inv) {
+                    const iframe = document.getElementById('receiptPrintFrame');
+                    if (!iframe) return;
+
+                    const itemsHtml = inv.items.map(item => `
+                        <tr>
+                            <td style="padding: 3px 0; text-align: right;">${item.name}</td>
+                            <td style="padding: 3px 0; text-align: center;">${item.qty}</td>
+                            <td style="padding: 3px 0; text-align: left;">${(item.price * item.qty).toFixed(2)}</td>
+                        </tr>
+                    `).join('');
+
+                    const receiptHtml = `
+                        <!DOCTYPE html>
+                        <html dir="rtl" lang="ar">
+                        <head>
+                            <meta charset="UTF-8">
+                            <style>
+                                @page { size: 80mm auto; margin: 0; }
+                                body {
+                                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                                    width: 78mm;
+                                    margin: 0 auto;
+                                    padding: 8px;
+                                    font-size: 11px;
+                                    line-height: 1.3;
+                                    color: #000;
+                                }
+                                .center { text-align: center; }
+                                .dashed { border-bottom: 1px dashed #000; margin: 6px 0; }
+                                .row { display: flex; justify-content: space-between; margin: 2px 0; }
+                                table { width: 100%; border-collapse: collapse; margin: 6px 0; }
+                                th { border-bottom: 1px solid #000; padding-bottom: 4px; }
+                                .bold { font-weight: bold; }
+                                .total-row { font-size: 13px; font-weight: bold; margin-top: 4px; padding-top: 4px; border-top: 1px solid #000; }
+                            </style>
+                        </head>
+                        <body>
+                            <div class="center">
+                                <h2 style="margin: 0; font-size: 15px;">${this.settings.storeName}</h2>
+                                <p style="margin: 2px 0;">${this.settings.receiptHeader || ''}</p>
+                                <p style="margin: 2px 0;">تليفون: ${this.settings.phone || ''}</p>
+                                <p style="margin: 2px 0;">${this.settings.address || ''}</p>
+                            </div>
+
+                            <div class="dashed"></div>
+
+                            <div class="row"><span>رقم الفاتورة:</span><span class="bold">${inv.id}</span></div>
+                            <div class="row"><span>التاريخ:</span><span>${inv.date}</span></div>
+                            <div class="row"><span>العميل:</span><span>${inv.customer}</span></div>
+                            <div class="row"><span>طريقة الدفع:</span><span>${inv.paymentMethod || 'نقدي'}</span></div>
+
+                            <div class="dashed"></div>
+
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th style="text-align: right;">الصنف</th>
+                                        <th style="text-align: center;">الكمية</th>
+                                        <th style="text-align: left;">الإجمالي</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${itemsHtml}
+                                </tbody>
+                            </table>
+
+                            <div class="dashed"></div>
+
+                            <div class="row"><span>المجموع الفرعي:</span><span>${inv.subtotal.toFixed(2)}</span></div>
+                            <div class="row"><span>الضريبة (${this.settings.taxRate}%):</span><span>${inv.tax.toFixed(2)}</span></div>
+                            ${inv.discount > 0 ? `<div class="row"><span>الخصم:</span><span>${inv.discount.toFixed(2)}</span></div>` : ''}
+                            
+                            <div class="row total-row">
+                                <span>الإجمالي الكلي:</span>
+                                <span>${inv.total.toFixed(2)} ${this.settings.currency}</span>
+                            </div>
+
+                            <div class="row" style="margin-top: 4px;">
+                                <span>المبلغ المدفوع:</span>
+                                <span>${inv.received.toFixed(2)} ${this.settings.currency}</span>
+                            </div>
+                            <div class="row">
+                                <span>المبلغ المتبقي:</span>
+                                <span>${inv.change.toFixed(2)} ${this.settings.currency}</span>
+                            </div>
+
+                            <div class="dashed"></div>
+
+                            <div class="center" style="margin-top: 8px;">
+                                <p style="margin: 0;">${this.settings.receiptFooter || ''}</p>
+                                <p style="margin: 4px 0 0 0; font-weight: bold;">*** شكراً لزيارتكم ***</p>
+                            </div>
+
+                            <script>
+                                window.onload = function() {
+                                    window.print();
+                                }
+                            <\/script>
+                        </body>
+                        </html>
+                    `;
+
+                    const doc = iframe.contentWindow.document;
+                    doc.open();
+                    doc.write(receiptHtml);
+                    doc.close();
+                },
+
+                deleteInvoice(index) {
+                    if (confirm('هل أنت تأكد من حذف هذه الفاتورة؟')) {
+                        this.invoices.splice(index, 1);
+                        this.saveToStorage();
+                        this.showToast('تم حذف الفاتورة بنجاح');
+                    }
+                },
+
+                deleteCustomer(index) {
+                    if (confirm('تنبيه: هل أنت متاكد من حذف هذا العميل من النظام؟')) {
+                        this.customers.splice(index, 1);
+                        this.saveToStorage();
+                        this.showToast('تم حذف العميل بنجاح');
+                    }
+                },
+
+                addCategory() {
+                    if (!this.newCategoryName.trim()) return;
+                    this.categories.push({ id: Date.now(), name: this.newCategoryName.trim() });
+                    this.newCategoryName = '';
+                    this.saveToStorage();
+                    this.showToast('تمت إضافة التصنيف');
+                },
+
+                addUnit() {
+                    if (!this.newUnitName.trim()) return;
+                    this.units.push(this.newUnitName.trim());
+                    this.newUnitName = '';
+                    this.saveToStorage();
+                    this.showToast('تمت إضافة الوحدة');
+                },
+
+                addCustomer() {
+                    if (!this.newCustomer.name.trim()) return;
+                    this.customers.push({ id: Date.now(), ...this.newCustomer });
+                    this.newCustomer = { name: '', phone: '' };
+                    this.saveToStorage();
+                    this.showToast('تم إضافة العميل بنجاح');
+                },
+
+                deleteProduct(index) {
+                    if (confirm('هل تريد حذف هذا المنتج؟')) {
+                        this.products.splice(index, 1);
+                        this.saveToStorage();
+                        this.showToast('تم حذف المنتج');
+                    }
+                },
+
+                openProductModal() {
+                    const name = prompt('اسم المنتج الجديد:');
+                    if (!name) return;
+                    const price = parseFloat(prompt('السعر:'));
+                    if (isNaN(price)) return;
+                    
+                    this.products.push({
+                        id: Date.now(),
+                        name: name,
+                        price: price,
+                        category: this.categories[0]?.name || 'عام',
+                        stock: 10,
+                        unit: 'قطعة'
+                    });
+                    this.saveToStorage();
+                    this.showToast('تم إضافة المنتج بنجاح');
+                },
+
+                getTabTitle(tabId) {
+                    const tab = this.tabs.find(t => t.id === tabId);
+                    return tab ? tab.name : '';
+                },
+
+                getTabIcon(tabId) {
+                    const tab = this.tabs.find(t => t.id === tabId);
+                    return tab ? tab.icon : '';
+                }
+            }
+        }
+    </script>
+</body>
+</html>
